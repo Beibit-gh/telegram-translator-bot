@@ -1,11 +1,10 @@
 import os
-from flask import Flask, request
-from telegram import Bot, Update
-from telegram.ext import Dispatcher, MessageHandler, CommandHandler, ContextTypes, filters
 import openai
 import asyncio
+from flask import Flask, request
+from telegram import Update, Bot
+from telegram.ext import Application, ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
-# Настройки
 openai.api_key = os.getenv("OPENAI_API_KEY")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 MODEL_NAME = "ft:gpt-3.5-turbo-1106:personal:firstbig:BG1zioJE"
@@ -14,27 +13,25 @@ SYSTEM_PROMPT = (
     "Always translate precisely and naturally. No additions. No omissions."
 )
 
-# Инициализация Flask и Telegram
+# Инициализация Flask
 app = Flask(__name__)
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
-dispatcher = Dispatcher(bot=bot, update_queue=None)
+application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
-# Обработка текста
+
 def split_text_smart(text, max_chars=1000):
     chunks = []
     current_chunk = ""
-
     while len(text) > max_chars:
         split_point = text.rfind(" ", 0, max_chars)
         if split_point == -1:
             split_point = max_chars
         chunks.append(text[:split_point].strip())
         text = text[split_point:].strip()
-
     if text:
         chunks.append(text)
-
     return chunks
+
 
 async def translate_text_with_progress(text: str, update: Update) -> str:
     parts = split_text_smart(text)
@@ -54,17 +51,15 @@ async def translate_text_with_progress(text: str, update: Update) -> str:
             )
             translated = response["choices"][0]["message"]["content"].strip()
             translated_parts.append(translated)
-
         except Exception as e:
             await update.message.reply_text(f"Ошибка перевода: {str(e)}")
 
     return "\n".join(translated_parts)
 
-# Команды
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Привет! Отправьте мне текстовый файл на казахском, турецком или английском языках, и я переведу его на русский."
-    )
+    await update.message.reply_text("Привет! Отправьте мне текстовый файл, и я переведу его на русский язык.")
+
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file = await update.message.document.get_file()
@@ -83,17 +78,25 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         os.remove(output_path)
 
-# Роутинг webhook
+
+# Flask endpoint для Webhook
 @app.route(f"/{TELEGRAM_BOT_TOKEN}", methods=["POST"])
-def webhook():
+async def webhook():
     update = Update.de_json(request.get_json(force=True), bot)
-    dispatcher.process_update(update)
+    await application.process_update(update)
     return "ok"
 
-# Запуск сервера Flask
-if __name__ == "__main__":
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(MessageHandler(filters.Document.ALL, handle_document))
 
-    PORT = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=PORT)
+# Запуск приложения
+if __name__ == "__main__":
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+
+    # Установка webhook (выполнить один раз вручную или автоматом)
+    webhook_url = os.getenv("WEBHOOK_URL")
+    if webhook_url:
+        asyncio.run(application.bot.set_webhook(f"{webhook_url}/{TELEGRAM_BOT_TOKEN}"))
+
+    # Flask запускается отдельно от PTB
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
