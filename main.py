@@ -1,18 +1,25 @@
 import os
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from flask import Flask, request
+from telegram import Bot, Update
+from telegram.ext import Dispatcher, MessageHandler, CommandHandler, ContextTypes, filters
 import openai
 import asyncio
 
+# Настройки
 openai.api_key = os.getenv("OPENAI_API_KEY")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 MODEL_NAME = "ft:gpt-3.5-turbo-1106:personal:firstbig:BG1zioJE"
-
 SYSTEM_PROMPT = (
     "You are a professional translator from Kazakh, Turkish, and English to Russian. "
     "Always translate precisely and naturally. No additions. No omissions."
 )
 
+# Инициализация Flask и Telegram
+app = Flask(__name__)
+bot = Bot(token=TELEGRAM_BOT_TOKEN)
+dispatcher = Dispatcher(bot=bot, update_queue=None)
+
+# Обработка текста
 def split_text_smart(text, max_chars=1000):
     chunks = []
     current_chunk = ""
@@ -53,8 +60,11 @@ async def translate_text_with_progress(text: str, update: Update) -> str:
 
     return "\n".join(translated_parts)
 
+# Команды
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Привет! Отправьте мне текстовый файл на казахском, турецком или английском языках, и я переведу его на русский.")
+    await update.message.reply_text(
+        "Привет! Отправьте мне текстовый файл на казахском, турецком или английском языках, и я переведу его на русский."
+    )
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file = await update.message.document.get_file()
@@ -73,9 +83,17 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         os.remove(output_path)
 
+# Роутинг webhook
+@app.route(f"/{TELEGRAM_BOT_TOKEN}", methods=["POST"])
+def webhook():
+    update = Update.de_json(request.get_json(force=True), bot)
+    dispatcher.process_update(update)
+    return "ok"
+
+# Запуск сервера Flask
 if __name__ == "__main__":
-    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
-    print("Бот запущен...")
-    app.run_polling()
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+
+    PORT = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=PORT)
