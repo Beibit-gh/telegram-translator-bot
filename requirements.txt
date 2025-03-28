@@ -1,5 +1,4 @@
-
-transformers
-torch
-flask
-python-telegram-bot
+transformers==4.37.2
+torch==2.1.2
+flask==2.2.5
+python-telegram-bot==20.7
