@@ -79,6 +79,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @app.route(f"/{TELEGRAM_BOT_TOKEN}", methods=["POST"])
 async def webhook():
     update = Update.de_json(request.get_json(force=True), bot)
+    await application.initialize()
     await application.process_update(update)
     return "ok"
 
