@@ -81,12 +81,13 @@ async def webhook():
     data = request.get_json(force=True)
     update = Update.de_json(data, application.bot)
 
-    if not application.ready:
+    if not application._initialized:
         await application.initialize()
         await application.post_init()
 
     await application.process_update(update)
     return "ok"
+
 
 if __name__ == "__main__":
     application.add_handler(CommandHandler("start", start))
