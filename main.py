@@ -1,6 +1,6 @@
-
 import os
-from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, Update
+from telegram import Update
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 from transformers import MarianTokenizer, MarianMTModel
 import torch
 
