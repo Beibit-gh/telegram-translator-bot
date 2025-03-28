@@ -1,5 +1,5 @@
 transformers==4.37.2
-torch==2.1.2
+torch==2.2.1
 flask==2.2.5
 python-telegram-bot==20.7
 sentencepiece
