@@ -78,11 +78,15 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @app.route(f"/{TELEGRAM_BOT_TOKEN}", methods=["POST"])
 async def webhook():
-    update = Update.de_json(request.get_json(force=True), bot)
-    await application.initialize()
+    data = request.get_json(force=True)
+    update = Update.de_json(data, application.bot)
+
+    if not application.ready:
+        await application.initialize()
+        await application.post_init()
+
     await application.process_update(update)
     return "ok"
-
 
 if __name__ == "__main__":
     application.add_handler(CommandHandler("start", start))
