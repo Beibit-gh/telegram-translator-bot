@@ -3,3 +3,4 @@ torch==2.2.1
 flask==2.2.5
 python-telegram-bot==20.7
 sentencepiece
+numpy<2.0
